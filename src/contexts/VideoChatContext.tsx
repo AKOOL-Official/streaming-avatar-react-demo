@@ -16,7 +16,7 @@ interface VideoChatContextProps {
   openapiHost: string;
   avatarId: string;
   openapiToken: string;
-  session: any;
+  session: SessionData | null;
   messageSendTo: string;
   updateResolution: (width: number, height: number) => Promise<void>;
   joinChannel: (appid: string, channel: string, token: string, uid: number) => Promise<void>;
@@ -36,6 +36,18 @@ interface VideoChatContextProps {
   setBotPersonality: React.Dispatch<React.SetStateAction<string>>;
   gptToken: string;
   setGptToken: React.Dispatch<React.SetStateAction<string>>;
+}
+
+interface SessionData {
+  _id: string;
+  uid: number;
+  stream_urls: {
+    agora_app_id: string;
+    agora_channel: string;
+    agora_token: string;
+    client_chat_room_url: string;
+    server_chat_room_url: string;
+  };
 }
 
 const VideoChatContext = createContext<VideoChatContextProps | undefined>(undefined);
@@ -64,7 +76,7 @@ export const VideoChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [openapiHost, setOpenapiHost] = useState("https://openapi.akool.com");
   const [avatarId, setAvatarId] = useState("dvp_Tristan_cloth2_1080P");
   const [openapiToken, setOpenapiToken] = useState(OPENAPI_TOKEN || '');
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
   const [messageSendTo, setMessageSendTo] = useState("");
   const [useGptChat, setUseGptChat] = useState(false);
   const [botPersonality, setBotPersonality] = useState("");
@@ -162,22 +174,6 @@ export const VideoChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsVideoSubed(false);
   }, [leaveChannel, leaveChat, closeSession, session]);
 
-  const startStreaming = useCallback(async () => {
-    const data = await createSession(avatarId);
-    setSession(data);
-
-    const { uid, stream_urls } = data;
-    const { agora_app_id, agora_channel, agora_token, client_chat_room_url, server_chat_room_url } = stream_urls;
-
-    const parts = server_chat_room_url.split("/");
-    const sendTo = parts[parts.length - 1].split(".")[0];
-
-    setMessageSendTo(sendTo);
-
-    await joinChannel(agora_app_id, agora_channel, agora_token, uid);
-    joinChat(client_chat_room_url);
-  }, [avatarId, createSession, joinChannel]);
-
   const joinChat = useCallback((chatUrl: string) => {
     if (socket) {
       socket.close();
@@ -211,6 +207,24 @@ export const VideoChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setSocket(ws);
   }, [socket]);
 
+
+  const startStreaming = useCallback(async () => {
+    const data = await createSession(avatarId);
+    setSession(data);
+
+    const { uid, stream_urls } = data;
+    const { agora_app_id, agora_channel, agora_token, client_chat_room_url, server_chat_room_url } = stream_urls;
+
+    const parts = server_chat_room_url.split("/");
+    const sendTo = parts[parts.length - 1].split(".")[0];
+
+    setMessageSendTo(sendTo);
+
+    await joinChannel(agora_app_id, agora_channel, agora_token, uid);
+    joinChat(client_chat_room_url);
+  }, [avatarId, createSession, joinChannel, joinChat]);
+
+  
   console.log(`useGptChat: ${useGptChat}`);
 
   const sendMessage = useCallback(async () => {
@@ -299,6 +313,7 @@ export const VideoChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useVideoChat = () => {
   const context = useContext(VideoChatContext);
   if (!context) {
